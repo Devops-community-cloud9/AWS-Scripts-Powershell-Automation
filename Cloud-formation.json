@@ -1,0 +1,93 @@
+{
+    "Parameters": {
+        "SolutionStack": { "Type": "String" },
+        "S3Source": { "Type": "String" },
+        "AppZip": { "Type": "String" },
+        "AppName": { "Type": "String" },
+        "DBArn": { "Type": "String" },
+        "SSLArn": { "Type": "String" }
+    },
+    "Resources": {
+        "MB01": {
+            "Type": "AWS::ElasticBeanstalk::Environment",
+            "Properties": {
+                "ApplicationName": {
+                    "Ref": "ENV"
+                },
+                "CNAMEPrefix": "app_name",
+                "EnvironmentName": "MB01",
+                "TemplateName": { "Ref": "Config1" },
+                "VersionLabel": { "Ref": "MBSoft"  },
+                "OptionSettings": [
+                    { "Namespace": "aws:autoscaling:launchconfiguration", "OptionName": "IamInstanceProfile", "Value": { "Ref": "AppProfile" } },
+                    { "Namespace": "aws:elasticbeanstalk:environment", "OptionName": "ServiceRole", "Value": { "Ref": "RootRole" } },
+                    { "Namespace": "aws:elasticbeanstalk:environment", "OptionName": "LoadBalancerType", "Value": "Application"  }
+                ]
+            }
+        },
+        "Config1": {
+            "Type": "AWS::ElasticBeanstalk::ConfigurationTemplate",
+            "Properties": {
+                "ApplicationName": {
+                    "Ref": "ENV"
+                },
+                "Description": "Scaling Configuration 1",
+                "OptionSettings": [
+                    {  "Namespace": "aws:autoscaling:asg",  "OptionName": "MinSize",  "Value": "1" },
+                    {  "Namespace": "aws:autoscaling:asg",  "OptionName": "MaxSize",  "Value": "4" },
+                    {  "Namespace": "aws:elbv2:listener:80", "OptionName": "ListenerEnabled",  "Value": "false" },
+                    {  "Namespace": "aws:elbv2:listener:443", "OptionName": "Protocol",  "Value": "HTTPS" },
+                    {  "Namespace": "aws:elbv2:listener:443", "OptionName": "SSLCertificateArns",  "Value": { "Ref": "SSLArn"} },
+                    {  "Namespace": "aws:elasticbeanstalk:environment:process:default", "OptionName": "HealthcheckPath", "Value": "/h"},
+                    {  "Namespace": "aws:autoscaling:launchconfiguration",  "OptionName": "InstanceType", "Value": "t2.medium" },
+                    {  "Namespace": "aws:elasticbeanstalk:environment",  "OptionName": "ServiceRole", "Value": "aws-elasticbeanstalk-service-role" },
+                    {  "Namespace": "aws:elasticbeanstalk:application:environment",  "OptionName": "domain", "Value": "openmethodscloud.com" },
+                    {  "Namespace": "aws:elasticbeanstalk:application:environment",  "OptionName": "server", "Value": { "Ref": "DBArn"} },
+                    {  "Namespace": "aws:elasticbeanstalk:application:environment",  "OptionName": "uid", "Value": "dbadmin" },
+                    {  "Namespace": "aws:elasticbeanstalk:application:environment",  "OptionName": "database", "Value": "maindb" },
+                    {  "Namespace": "aws:elasticbeanstalk:application:environment",  "OptionName": "pass",  "Value": "adminpass" }
+                ],
+                "SolutionStackName": { "Ref": "SolutionStack" }
+            },
+            "DependsOn": []
+        },
+        "MBSoft": {
+            "Type": "AWS::ElasticBeanstalk::ApplicationVersion",
+            "Properties": {
+                "ApplicationName": { "Ref": "ENV" },
+                "Description": "Media Bar Application",
+                "SourceBundle": {
+                    "S3Bucket": { "Ref": "S3Source" },
+                    "S3Key": { "Ref": "AppZip" }
+                }
+            }
+        },
+        "AppProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": { "Roles": [  { "Ref": "RootRole"  }  ]  }
+        },
+        "RootRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [  {
+                            "Effect": "Allow",
+                            "Principal": {  "Service": [ "ec2.amazonaws.com" ] },
+                            "Action": [  "sts:AssumeRole"  ] }  ]
+                },
+                "Path": "/",
+                "Policies": [ {
+                        "PolicyName": "root",  "PolicyDocument": { "Version": "2012-10-17",  "Statement": [ { "Effect": "Allow", "Action": "*", "Resource": "*" } ] }
+                    } ]
+            }
+        },
+        "ENV": {
+            "Type": "AWS::ElasticBeanstalk::Application",
+            "Properties": {
+                "ApplicationName": { "Ref": "AppName" },
+                "Description": "Open Methods Production"
+            }
+        }
+    }
+}
